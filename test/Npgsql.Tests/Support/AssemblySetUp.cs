@@ -28,10 +28,34 @@ public class AssemblySetUp
             // Connection to the default connection string failed, use Docker to run PostgreSQL
             _postgreSqlContainer = new PostgreSqlBuilder(ContainerImage).WithName(ContainerName).Build();
             await _postgreSqlContainer.StartAsync();
+            if (ContainerImage.Repository == "postgres")
+            {
+                await EnableSslAsync(_postgreSqlContainer);
+            }
 
             TestUtil.ConnectionString = _postgreSqlContainer.GetConnectionString();
             CheckConnection();
         }
+    }
+
+    static async Task EnableSslAsync(PostgreSqlContainer container)
+    {
+        const string serverCrt = "/var/lib/postgresql/server.crt";
+        const string serverKey = "/var/lib/postgresql/server.key";
+        const string configureSsl = $"""
+                                     ALTER SYSTEM SET ssl = 'on';
+                                     ALTER SYSTEM SET ssl_cert_file = '{serverCrt}';
+                                     ALTER SYSTEM SET ssl_key_file = '{serverKey}';
+                                     """;
+
+        await container.ExecAsync(["openssl", "req", "-new", "-x509", "-days", "365", "-nodes", "-text", "-out", serverCrt, "-keyout", serverKey, "-subj", "/CN=localhost"]);
+        await container.ExecAsync(["chown", "postgres:postgres", serverCrt, serverKey]);
+        await container.ExecAsync(["chmod", "600", serverKey]);
+        await container.ExecAsync(["chmod", "644", serverCrt]);
+        await container.ExecScriptAsync(configureSsl);
+
+        await container.StopAsync();
+        await container.StartAsync();
     }
 
     static void CheckConnection()
