@@ -3,12 +3,38 @@ using Npgsql.Tests;
 using NUnit.Framework;
 using System;
 using System.Threading;
+using System.Threading.Tasks;
+using DotNet.Testcontainers.Images;
+using Testcontainers.PostgreSql;
 
 [SetUpFixture]
 public class AssemblySetUp
 {
+    PostgreSqlContainer? _postgreSqlContainer;
+
+    protected virtual DockerImage ContainerImage => new(Environment.GetEnvironmentVariable("NPGSQL_TEST_DOCKER_IMAGE") ?? "postgres:18");
+
+    protected virtual string? ContainerName => typeof(AssemblySetUp).Assembly.GetName().Name;
+
     [OneTimeSetUp]
-    public void Setup()
+    public async Task Setup()
+    {
+        try
+        {
+            CheckConnection();
+        }
+        catch when (Environment.GetEnvironmentVariable("NPGSQL_TEST_DB") == null)
+        {
+            // Connection to the default connection string failed, use Docker to run PostgreSQL
+            _postgreSqlContainer = new PostgreSqlBuilder(ContainerImage).WithName(ContainerName).Build();
+            await _postgreSqlContainer.StartAsync();
+
+            TestUtil.ConnectionString = _postgreSqlContainer.GetConnectionString();
+            CheckConnection();
+        }
+    }
+
+    static void CheckConnection()
     {
         var connString = TestUtil.ConnectionString;
         using var conn = new NpgsqlConnection(connString);
@@ -40,6 +66,15 @@ public class AssemblySetUp
             }
 
             throw;
+        }
+    }
+
+    [OneTimeTearDown]
+    public async Task TearDown()
+    {
+        if (_postgreSqlContainer != null)
+        {
+            await _postgreSqlContainer.DisposeAsync();
         }
     }
 }
