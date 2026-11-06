@@ -2,6 +2,7 @@ using Npgsql;
 using Npgsql.Tests;
 using NUnit.Framework;
 using System;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Images;
@@ -44,7 +45,14 @@ public class AssemblySetUp
             await _postgreSqlContainer.StartAsync();
             await _postgreSqlContainer.ConfigureAsync();
 
-            TestUtil.ConnectionString = _postgreSqlContainer.GetConnectionString();
+            var csb = new NpgsqlConnectionStringBuilder(_postgreSqlContainer.GetConnectionString());
+            if (IPAddress.TryParse(csb.Host, out var ip) && (ip.Equals(IPAddress.Loopback) || ip.Equals(IPAddress.IPv6Loopback)))
+            {
+                // Required for Connect_with_verify_and_ca_cert(VerifyFull) in order to prevent SSL host mismatch error
+                csb.Host = "localhost";
+            }
+
+            TestUtil.ConnectionString = csb.ToString();
             CheckConnection();
         }
     }

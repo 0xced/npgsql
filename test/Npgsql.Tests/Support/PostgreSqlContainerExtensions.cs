@@ -1,7 +1,5 @@
-using System;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Configurations;
 using Npgsql.Tests.Replication;
@@ -23,7 +21,6 @@ static class PostgreSqlContainerExtensions
     /// </summary>
     public static async Task ConfigureAsync(this PostgreSqlContainer container)
     {
-        var now = DateTimeOffset.UtcNow;
         const UnixFileModes certMode = UnixFileModes.UserRead | UnixFileModes.UserWrite | UnixFileModes.GroupRead | UnixFileModes.OtherRead;
         const UnixFileModes keyMode = UnixFileModes.UserRead | UnixFileModes.UserWrite;
         const string sslCertPath = "/var/lib/postgresql/server.crt";
@@ -41,14 +38,8 @@ static class PostgreSqlContainerExtensions
         var uid = uint.Parse((await container.ExecAsync(["id", "-u", "postgres"])).Stdout);
         var gid = uint.Parse((await container.ExecAsync(["id", "-g", "postgres"])).Stdout);
 
-        using var rsa = RSA.Create(2048);
-        var request = new CertificateRequest(new X500DistinguishedName("CN=localhost"), rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        using var certificate = request.CreateSelfSigned(notBefore: now, notAfter: now.AddDays(1));
-        var certPem = certificate.ExportCertificatePem();
-        var keyPem = rsa.ExportPkcs8PrivateKeyPem();
-
-        await container.CopyAsync(Encoding.Default.GetBytes(certPem), sslCertPath, uid, gid, certMode);
-        await container.CopyAsync(Encoding.Default.GetBytes(keyPem), sslKeyPath, uid, gid, keyMode);
+        await container.CopyAsync(GetBuildFileContents("server.crt"), sslCertPath, uid, gid, certMode);
+        await container.CopyAsync(GetBuildFileContents("server.key"), sslKeyPath, uid, gid, keyMode);
 
         await container.ExecScriptAsync(configureSsl);
         await container.ExecAsync(["sh", "-c", """
@@ -58,4 +49,7 @@ static class PostgreSqlContainerExtensions
         await container.StopAsync();
         await container.StartAsync();
     }
+
+    static byte[] GetBuildFileContents(string file, [CallerFilePath] string path = "")
+        => File.ReadAllBytes(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, "..", "..", "..", ".build", file)));
 }

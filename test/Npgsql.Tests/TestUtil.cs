@@ -32,6 +32,10 @@ public static class TestUtil
         Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != null ||
         Environment.GetEnvironmentVariable("CI") != null;
 
+    public static bool IsOnDocker =>
+        Environment.GetEnvironmentVariable("NPGSQL_TEST_DB") == null &&
+        ConnectionString != DefaultConnectionString;
+
     /// <summary>
     /// Calls Assert.Ignore() unless we're on the build server, in which case calls
     /// Assert.Fail(). We don't to miss any regressions just because something was misconfigured

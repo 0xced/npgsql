@@ -513,11 +513,10 @@ public class SecurityTests : TestBase
     }
 
     [Test]
-    [Platform(Exclude = PlatformNames.MacOSX, Reason = "Mac requires explicit opt-in to receive CA certificate in TLS handshake")]
     public async Task Connect_with_verify_and_ca_cert([Values(SslMode.VerifyCA, SslMode.VerifyFull)] SslMode sslMode)
     {
-        if (!IsOnBuildServer)
-            Assert.Ignore("Only executed in CI");
+        if (!(IsOnBuildServer || IsOnDocker))
+            Assert.Ignore("Only executed in CI or in Docker");
 
         await using var dataSource = CreateDataSource(csb =>
         {
@@ -529,11 +528,10 @@ public class SecurityTests : TestBase
     }
 
     [Test]
-    [Platform(Exclude = PlatformNames.MacOSX, Reason = "Mac requires explicit opt-in to receive CA certificate in TLS handshake")]
     public async Task Connect_with_verify_check_host([Values(SslMode.VerifyCA, SslMode.VerifyFull)] SslMode sslMode)
     {
-        if (!IsOnBuildServer)
-            Assert.Ignore("Only executed in CI");
+        if (!(IsOnBuildServer || IsOnDocker))
+            Assert.Ignore("Only executed in CI or in Docker");
 
         await using var dataSource = CreateDataSource(csb =>
         {
@@ -554,11 +552,10 @@ public class SecurityTests : TestBase
     }
 
     [Test]
-    [Platform(Exclude = PlatformNames.MacOSX, Reason = "Mac requires explicit opt-in to receive CA certificate in TLS handshake")]
     public async Task Connect_with_verify_and_multiple_ca_cert([Values(SslMode.VerifyCA, SslMode.VerifyFull)] SslMode sslMode, [Values] bool realCaFirst)
     {
-        if (!IsOnBuildServer)
-            Assert.Ignore("Only executed in CI");
+        if (!(IsOnBuildServer || IsOnDocker))
+            Assert.Ignore("Only executed in CI or in Docker");
 
         var certificates = new X509Certificate2Collection();
 
